@@ -54,14 +54,15 @@ class HistoryBot:
         self.history_converter = HistoryToTweetConverter()
         self.tweet_gen = TweetGenerator(self.config)
         
-        # Tweet scheduling - CUSTOM HOURS (12:30 start)
-        self.tweets_per_day = 15
-        self.peak_start_hour = 12  # 12:30 PM
-        self.peak_start_minute = 30
-        self.peak_end_hour = 21    # 9 PM
+        # Tweet scheduling - 12:00-19:30, every 30 mins
+        self.tweets_per_day = 15  # 30 min apart = 15 tweets in 7.5 hours
+        self.peak_start_hour = 12
+        self.peak_start_minute = 0
+        self.peak_end_hour = 19
+        self.peak_end_minute = 30
         
-        # Tweet every 20 minutes
-        self.interval_minutes = 20
+        # Tweet every 30 minutes
+        self.interval_minutes = 30
         
         self.daily_tweet_count = 0
         self.last_reset = datetime.now().date()
@@ -72,25 +73,27 @@ class HistoryBot:
         logger.info("✅ Bot initialized successfully!")
     
     def is_peak_hour(self):
-        """Check if current time is within active hours (12:30-21:00)"""
+        """Check if current time is within active hours (09:10-21:10)"""
         current_time = datetime.now()
         current_hour = current_time.hour
         current_minute = current_time.minute
         
-        # Check if after 12:30
+        # Check if after 09:10
         if current_hour < self.peak_start_hour:
             return False
         elif current_hour == self.peak_start_hour and current_minute < self.peak_start_minute:
             return False
         
-        # Check if before 21:00
-        if current_hour >= self.peak_end_hour:
+        # Check if before 21:10
+        if current_hour > self.peak_end_hour:
+            return False
+        elif current_hour == self.peak_end_hour and current_minute >= self.peak_end_minute:
             return False
             
         return True
     
     def post_history_tweet(self):
-        """Fetch historical event and post a tweet (only during peak hours)"""
+        """Fetch historical event and post a tweet"""
         try:
             # Reset daily counter
             today = datetime.now().date()
@@ -98,12 +101,6 @@ class HistoryBot:
                 self.daily_tweet_count = 0
                 self.last_reset = today
                 logger.info("🔄 Daily counter reset")
-            
-            # Check if within peak hours
-            if not self.is_peak_hour():
-                current_time = datetime.now().strftime('%H:%M')
-                logger.info(f"⏸️  Outside active hours (current: {current_time}, active: {self.peak_start_hour}:{self.peak_start_minute:02d}-{self.peak_end_hour}:00)")
-                return
             
             # Check daily limit
             if self.daily_tweet_count >= self.tweets_per_day:
@@ -173,43 +170,43 @@ class HistoryBot:
             traceback.print_exc()
     
     def run(self):
-        """Start the bot with custom scheduling (12:30-21:00, every 20 mins)"""
+        """Start the bot - posts at 12:00, then every 30 minutes until 19:30"""
         logger.info("=" * 60)
-        logger.info("📜 HISTORY BOT STARTED - CUSTOM SCHEDULE")
+        logger.info("📜 HISTORY BOT STARTED")
         logger.info("=" * 60)
         logger.info(f"📅 Today: {datetime.now().strftime('%B %d, %Y')}")
-        logger.info(f"⏰ Active Hours: {self.peak_start_hour}:{self.peak_start_minute:02d}-{self.peak_end_hour}:00")
-        logger.info(f"📊 Posting {self.tweets_per_day} tweets during active hours")
-        logger.info(f"⏱️  Every {self.interval_minutes} minutes")
+        logger.info(f"⏰ Active Hours: 12:00-19:30")
+        logger.info(f"📊 Posting 15 tweets during the day")
+        logger.info(f"⏱️  Every 30 minutes")
         logger.info("=" * 60)
         
-        # Check if currently in active hours
-        if self.is_peak_hour():
+        current_time = datetime.now()
+        current_hour = current_time.hour
+        current_minute = current_time.minute
+        
+        # Check if we're within active hours
+        is_active = False
+        if current_hour > self.peak_start_hour or (current_hour == self.peak_start_hour and current_minute >= self.peak_start_minute):
+            if current_hour < self.peak_end_hour or (current_hour == self.peak_end_hour and current_minute <= self.peak_end_minute):
+                is_active = True
+        
+        if is_active:
+            # We're in active hours - post immediately
             logger.info("🚀 We're in active hours! Posting first tweet now...")
             logger.info("")
             self.post_history_tweet()
         else:
-            current_time = datetime.now()
-            current_hour = current_time.hour
-            current_minute = current_time.minute
-            
+            # Not in active hours - wait
             if current_hour < self.peak_start_hour or (current_hour == self.peak_start_hour and current_minute < self.peak_start_minute):
-                # Before 12:30
-                hours_to_wait = self.peak_start_hour - current_hour
-                minutes_to_wait = self.peak_start_minute - current_minute
-                if minutes_to_wait < 0:
-                    hours_to_wait -= 1
-                    minutes_to_wait += 60
-                logger.info(f"⏰ Waiting for active hours (starts in ~{hours_to_wait}h {minutes_to_wait}m)")
+                logger.info(f"⏰ Waiting for active hours to start at 12:00")
             else:
-                # After 21:00
-                logger.info(f"⏰ Active hours ended for today. Will resume tomorrow at {self.peak_start_hour}:{self.peak_start_minute:02d}")
+                logger.info(f"⏰ Active hours ended for today. Will resume tomorrow at 12:00")
         
-        # Schedule regular tweets
+        # Schedule regular tweets every 30 minutes
         schedule.every(self.interval_minutes).minutes.do(self.post_history_tweet)
         
         logger.info("")
-        logger.info(f"✅ Scheduled to check every {self.interval_minutes} minutes")
+        logger.info(f"✅ Scheduled to post every {self.interval_minutes} minutes")
         logger.info("🤖 Bot is running! Press Ctrl+C to stop.")
         logger.info("")
         

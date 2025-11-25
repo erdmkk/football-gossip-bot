@@ -167,21 +167,22 @@ class HistoryFetcher:
         """
         Select dramatic/mythological/chaotic event
         Priority: wars, deaths, mythology, catastrophes, famous figures
+        Returns random selection from TOP 15 most important events
         """
         if not events:
             return None
         
-        # Score events based on dramatic keywords
+        # Score ALL events
         scored_events = []
         for event in events:
             text = event.get('text', '').lower()
             year = event.get('year', 0)
             event_type = event.get('type', '')
             
-            # Calculate drama score
+            # Calculate importance score
             score = 0
             
-            # Keyword matching
+            # Keyword matching - HIGH priority
             for keyword in self.priority_keywords:
                 if keyword.lower() in text:
                     score += 10
@@ -192,23 +193,34 @@ class HistoryFetcher:
             elif event_type == 'event':
                 score += 5
             
-            # Era bonuses
-            if 1914 <= year <= 1945:  # World Wars
-                score += 20
-            elif year < 500:  # Ancient/mythological
-                score += 15
-            elif 500 <= year <= 1500:  # Medieval
-                score += 10
+            # Era bonuses - prioritize dramatic periods
+            try:
+                year_int = int(year)
+                if 1914 <= year_int <= 1945:  # World Wars
+                    score += 20
+                elif year_int < 500:  # Ancient/mythological
+                    score += 15
+                elif 500 <= year_int <= 1500:  # Medieval
+                    score += 10
+                elif 1900 <= year_int <= 2000:  # Modern history
+                    score += 8
+            except:
+                pass
                 
             scored_events.append((score, event))
         
-        # Sort by score and take top candidates
+        # Sort by score (highest first)
         scored_events.sort(reverse=True, key=lambda x: x[0])
-        top_events = scored_events[:max(5, len(scored_events) // 4)]
         
-        # Randomly select from top events
-        if top_events:
-            selected = random.choice(top_events)[1]
+        # Take TOP 15 most important events
+        top_15 = scored_events[:15]
+        
+        logger.info(f"🏆 Selected top 15 events from {len(scored_events)} total")
+        logger.debug(f"Top event score: {top_15[0][0] if top_15 else 0}")
+        
+        # Randomly select from top 15
+        if top_15:
+            selected = random.choice(top_15)[1]
             
             # Try to get detailed summary
             detailed = self.get_event_details(selected)

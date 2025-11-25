@@ -10,6 +10,9 @@ python-dotenv==1.0.0
 # Scheduling
 schedule==1.2.0
 
+# RSS Feed Parser
+feedparser==6.0.10
+
 # Data processing
 pandas==2.1.4
 
